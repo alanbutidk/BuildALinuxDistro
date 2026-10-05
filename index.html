@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>distroyml</title>
+<style>
+:root{--bg:#0a2463;--panel:#d4d7dd;--ink:#0f1b3d;--mute:#53607f;--line:#9aa3b8;--hi:#f2c94c;--bad:#a32020;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+main{max-width:720px;margin:0 auto;padding:16px 14px}
+h1{margin:4px 0 2px;font-size:22px;color:#fff;letter-spacing:.02em}
+.sub{color:#b8c4ea;margin:0 0 16px;font-size:13px}
+details{background:var(--panel);margin-bottom:12px;border:2px solid #fff;border-right-color:#6b7385;border-bottom-color:#6b7385}
+summary{cursor:pointer;padding:10px 12px;font-weight:700;list-style:none;background:var(--hi);color:#2b2200}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+ ";}
+details[open] summary::before{content:"- ";}
+.body{padding:6px 12px 12px}
+label,.lab{display:block;margin:12px 0 4px;color:var(--mute);font-size:13px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:#f3f4f7;border:1px solid var(--line);padding:9px 10px;border-radius:0}
+textarea{resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3px solid var(--bg);outline-offset:1px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;padding:6px 10px;background:#f3f4f7;color:var(--ink);border:1px solid var(--line);border-radius:0;cursor:pointer}
+.chip.on{background:var(--bg);color:#fff;border-color:var(--bg)}
+.chip.on::before{content:"[x] "}
+.chip:not(.on)::before{content:"[ ] "}
+.note{color:var(--bad);font-size:12px;margin-top:4px;min-height:0}
+#out{background:#06143d;color:#d9e2ff;padding:12px;margin:0;overflow-x:auto;font-size:13px;line-height:1.45;border:2px solid #fff;border-right-color:#6b7385;border-bottom-color:#6b7385}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--panel);border-top:2px solid #fff}
+.bar button{flex:1;font:inherit;font-weight:700;padding:11px 4px;background:var(--bg);color:#fff;border:0;border-radius:0;cursor:pointer}
+.bar button.alt{background:#f3f4f7;color:var(--ink);border:1px solid var(--line)}
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--hi);color:#2b2200;padding:8px 14px;font-weight:700;opacity:0;transition:opacity .15s;pointer-events:none}
+.toast.show{opacity:1}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>distroyml</h1>
+<p class="sub">Pick your kernel and distro options. Get one config.yml.</p>
+<div id="form"></div>
+<details open><summary>config.yml</summary><div class="body"><pre id="out"></pre></div></details>
+</main>
+<div class="bar">
+<button id="copy">Copy</button>
+<button id="dl">Download</button>
+<button id="share" class="alt">Share link</button>
+<button id="reset" class="alt">Reset</button>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const SCHEMA=[
+{id:"base",title:"Base",fields:[
+{k:"name",l:"Distro name",t:"text",d:"mydistro"},
+{k:"version",l:"Version",t:"text",d:"1.0"},
+{k:"hostname",l:"Default hostname",t:"text",d:"mydistro"},
+{k:"arch",l:"Architecture",t:"select",o:["x86_64","aarch64","riscv64"],d:"x86_64"}]},
+{id:"kernel",title:"Kernel",fields:[
+{k:"version",l:"Version",t:"select",o:["6.12","6.6","6.1","latest"],d:"6.12"},
+{k:"preset",l:"Preset",t:"select",o:["stock","desktop","server","low-latency","minimal"],d:"stock"},
+{k:"features",l:"Features",t:"multi",o:["modules","kvm","apparmor","selinux","btrfs","wireguard","bpf","debug-info"],d:["modules"]},
+{k:"config",l:"Raw Kconfig overrides",t:"kv",h:"PREEMPT=y\nHZ=1000",d:""}]},
+{id:"boot",title:"Boot",fields:[
+{k:"loader",l:"Bootloader",t:"select",o:["grub","systemd-boot","limine","syslinux"],d:"grub"},
+{k:"firmware",l:"Firmware",t:"select",o:["uefi","bios","both"],d:"uefi"}]},
+{id:"init",title:"Init",fields:[
+{k:"system",l:"Init system",t:"select",o:["systemd","openrc","runit","s6"],d:"systemd"}]},
+{id:"userland",title:"Userland",fields:[
+{k:"libc",l:"C library",t:"select",o:["glibc","musl"],d:"glibc"},
+{k:"coreutils",l:"Core utilities",t:"select",o:["gnu","busybox","uutils"],d:"gnu"},
+{k:"shell",l:"Default shell",t:"select",o:["bash","zsh","fish","dash"],d:"bash"}]},
+{id:"packages",title:"Packages",fields:[
+{k:"manager",l:"Package manager",t:"select",o:["apt","pacman","apk","dnf"],d:"apt"},
+{k:"browser",l:"Browser",t:"select",o:["none","firefox","chromium","librewolf"],d:"firefox"},
+{k:"terminal",l:"Terminal",t:"select",o:["none","foot","alacritty","kitty","gnome-terminal"],d:"alacritty"},
+{k:"editor",l:"Editor",t:"select",o:["none","nano","vim","neovim","kate"],d:"nano"},
+{k:"extra",l:"Extra packages (one per line)",t:"lines",h:"git\nhtop",d:""}]},
+{id:"desktop",title:"Desktop",fields:[
+{k:"environment",l:"Environment",t:"select",o:["none","gnome","kde","xfce","sway","hyprland"],d:"xfce"},
+{k:"display",l:"Display server",t:"select",o:["wayland","x11"],d:"x11"},
+{k:"login",l:"Login manager",t:"select",o:["none","gdm","sddm","lightdm","greetd"],d:"lightdm"}]},
+{id:"image",title:"Image",fields:[
+{k:"installer",l:"Output",t:"select",o:["live-iso","calamares","raw-disk","rootfs-tarball"],d:"live-iso"}]}
+];
+const RULES=[
+{if:["init.system","openrc"],off:["desktop.environment",["gnome","kde"]]},
+{if:["init.system","runit"],off:["desktop.environment",["gnome","kde"]]},
+{if:["userland.libc","musl"],off:["packages.manager",["apt","dnf"]]},
+{if:["userland.libc","musl"],off:["packages.browser",["chromium"]]},
+{if:["boot.firmware","bios"],off:["boot.loader",["systemd-boot"]]},
+{if:["boot.loader","systemd-boot"],off:["boot.firmware",["bios"]]},
+{if:["desktop.environment","none"],off:["desktop.login",["gdm","sddm","lightdm","greetd"]]},
+{if:["desktop.environment","sway"],off:["desktop.display",["x11"]]},
+{if:["desktop.environment","hyprland"],off:["desktop.display",["x11"]]},
+{if:["desktop.environment","xfce"],off:["desktop.display",["wayland"]]}
+];
+const REASON={"init.system":"needs a non-systemd-compatible desktop","userland.libc":"not available with musl","boot.firmware":"not available with BIOS","boot.loader":"conflicts with this bootloader","desktop.environment":"conflicts with another choice","desktop.display":"not supported by this desktop"};
+const $=(s,r=document)=>r.querySelector(s);
+const key=(s,f)=>s.id+"."+f.k;
+const FIELDS=SCHEMA.flatMap(s=>s.fields.map(f=>({s,f,k:key(s,f)})));
+const defaults=()=>Object.fromEntries(FIELDS.map(({f,k})=>[k,Array.isArray(f.d)?[...f.d]:f.d]));
+let S=defaults();
+try{const h=location.hash.slice(1);if(h){const p=JSON.parse(decodeURIComponent(atob(h)));for(const k in S)if(k in p)S[k]=p[k]}}catch(e){}
+const offSet=k=>{const o=new Set();for(const r of RULES)if(S[r.if[0]]===r.if[1]&&r.off[0]===k)r.off[1].forEach(v=>o.add(v));return o};
+function fix(){for(let i=0;i<3;i++)for(const{f,k}of FIELDS){if(f.t!=="select")continue;const off=offSet(k);if(off.has(S[k]))S[k]=f.o.find(o=>!off.has(o))}}
+function build(){
+$("#form").innerHTML=SCHEMA.map((s,i)=>`<details${i<3?" open":""}><summary>${s.title}</summary><div class="body">${s.fields.map(f=>{
+const k=key(s,f);
+if(f.t==="select")return `<label for="${k}">${f.l}</label><select id="${k}" data-k="${k}">${f.o.map(o=>`<option>${o}</option>`).join("")}</select><div class="note" id="n-${k}"></div>`;
+if(f.t==="multi")return `<div class="lab">${f.l}</div><div class="chips">${f.o.map(o=>`<button type="button" class="chip" data-m="${k}" data-v="${o}">${o}</button>`).join("")}</div>`;
+if(f.t==="text")return `<label for="${k}">${f.l}</label><input id="${k}" data-k="${k}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+return `<label for="${k}">${f.l}</label><textarea id="${k}" data-k="${k}" rows="4" placeholder="${f.h.replace(/\n/g,"&#10;")}" autocapitalize="off" spellcheck="false"></textarea>`}).join("")}</div></details>`).join("")}
+const q=(v,raw)=>{if(typeof v==="number")return String(v);v=String(v);return /^[A-Za-z][\w.\/+-]*$/.test(v)&&!/^(yes|no|true|false|on|off|null)$/i.test(v)?v:JSON.stringify(v)};
+function toYaml(o,i=0){const p="  ".repeat(i);return Object.entries(o).map(([k,v])=>{
+if(Array.isArray(v))return v.length?`${p}${k}:\n${v.map(x=>`${p}  - ${q(x)}`).join("\n")}`:`${p}${k}: []`;
+if(v&&typeof v==="object")return Object.keys(v).length?`${p}${k}:\n${toYaml(v,i+1)}`:`${p}${k}: {}`;
+return `${p}${k}: ${q(v)}`}).join("\n")}
+function tree(){const o={};for(const s of SCHEMA){const t={};for(const f of s.fields){let v=S[key(s,f)];
+if(f.t==="multi")v=[...v];
+else if(f.t==="kv"){const m={};v.split("\n").map(x=>x.trim()).filter(x=>x&&x[0]!=="#").forEach(x=>{const i=x.indexOf("=");if(i>0){const a=x.slice(0,i).trim().replace(/^CONFIG_/,""),b=x.slice(i+1).trim();m[a]=/^\d+$/.test(b)?+b:b}});v=m}
+else if(f.t==="lines")v=v.split("\n").map(x=>x.trim()).filter(Boolean);
+t[f.k]=v}o[s.id]=t}return o}
+const yaml=()=>"schema: 1\n"+toYaml(tree())+"\n";
+function sync(){
+fix();
+for(const{f,k}of FIELDS){const el=document.getElementById(k);
+if(f.t==="select"){const off=offSet(k);el.value=S[k];[...el.options].forEach(op=>op.disabled=off.has(op.value));
+const bad=f.o.filter(o=>off.has(o));$("#n-"+k).textContent=bad.length?bad.join(", ")+": "+(REASON[RULES.find(r=>r.off[0]===k&&S[r.if[0]]===r.if[1]).if[0]]||"conflict"):""}
+else if(f.t==="multi"){document.querySelectorAll(`[data-m="${k}"]`).forEach(b=>b.classList.toggle("on",S[k].includes(b.dataset.v)))}
+else if(el.value!==S[k])el.value=S[k]}
+$("#out").textContent=yaml()}
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.id);toast.id=setTimeout(()=>t.classList.remove("show"),1400)};
+$("#form").addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;S[k]=e.target.value;sync()});
+$("#form").addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const a=S[b.dataset.m],v=b.dataset.v,i=a.indexOf(v);i<0?a.push(v):a.splice(i,1);sync()});
+$("#copy").onclick=async()=>{try{await navigator.clipboard.writeText(yaml());toast("Copied")}catch(e){toast("Copy failed")}};
+$("#dl").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([yaml()],{type:"text/yaml"}));a.download="config.yml";a.click();toast("Downloaded")};
+$("#share").onclick=async()=>{const h="#"+btoa(encodeURIComponent(JSON.stringify(S)));history.replaceState(null,"",h);try{await navigator.clipboard.writeText(location.href);toast("Link copied")}catch(e){toast("Link is in the address bar")}};
+$("#reset").onclick=()=>{S=defaults();history.replaceState(null,"",location.pathname);sync();toast("Reset")};
+build();sync();
+</script>
+</body>
+</html>
