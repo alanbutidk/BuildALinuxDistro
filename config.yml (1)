@@ -1,0 +1,43 @@
+schema: 1
+base:
+  name: defOS
+  version: "1.0"
+  hostname: user
+  arch: x86_64
+kernel:
+  version: "6.12"
+  preset: desktop
+  features:
+    - kvm
+    - apparmor
+    - debug-info
+  config: {}
+boot:
+  loader: systemd-boot
+  firmware: uefi
+init:
+  system: systemd
+userland:
+  libc: glibc
+  coreutils: gnu
+  shell: bash
+packages:
+  manager: pacman
+  browser: firefox
+  terminal: kitty
+  editor: neovim
+  extra:
+    - git
+    - htop
+    - binutils
+    - gcc
+    - make
+    - nasm
+    - python
+    - wine
+desktop:
+  environment: hyprland
+  display: wayland
+  login: sddm
+image:
+  installer: calamares
