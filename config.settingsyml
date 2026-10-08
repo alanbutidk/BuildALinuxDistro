@@ -1,6 +1,6 @@
 schema: 1
 base:
-  name: defOS
+  name: test
   version: "1.0"
   hostname: user
   arch: x86_64
@@ -8,9 +8,7 @@ kernel:
   version: "6.12"
   preset: desktop
   features:
-    - kvm
-    - apparmor
-    - debug-info
+    - bpf
   config: {}
 boot:
   loader: systemd-boot
@@ -29,12 +27,9 @@ packages:
   extra:
     - git
     - htop
-    - binutils
     - gcc
     - make
-    - nasm
     - python
-    - wine
 desktop:
   environment: hyprland
   display: wayland
